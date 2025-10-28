@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Update Car Regulation Data</title>
+<style>
+  body {
+    font-family: "Segoe UI", Arial, sans-serif;
+    background-color: #f9fafc;
+    margin: 40px;
+    color: #333;
+  }
+  h1 { text-align: center; color: #2c3e50; }
+  form {
+    max-width: 600px;
+    margin: 0 auto;
+    background: white;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  }
+  label { display: block; margin-top: 10px; font-weight: bold; }
+  input, select {
+    width: 100%;
+    padding: 8px;
+    margin-top: 5px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+  }
+  button {
+    margin-top: 15px;
+    background-color: #1cc88a;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: bold;
+  }
+  button:hover {
+    background-color: #17a673;
+  }
+  .btn-view {
+    display: block;
+    text-align: center;
+    margin-top: 20px;
+    color: #2c3e50;
+    text-decoration: none;
+    font-weight: bold;
+  }
+</style>
+</head>
+<body>
+<h1>Car Regulation Data Entry</h1>
+
+<form id="dataForm">
+  <label>Regulation Name:</label>
+  <input type="text" id="regName" placeholder="e.g. BS7" required>
+
+  <label>Model Name:</label>
+  <input type="text" id="modelName" placeholder="e.g. YTA" required>
+
+  <label>Planned Date (Regulation):</label>
+  <input type="date" id="plannedDate" required>
+
+  <label>Implementation Date (for Model):</label>
+  <input type="date" id="implDate" required>
+
+  <button type="submit">Save Data</button>
+</form>
+
+<a href="dashboard.html" class="btn-view">➡ Go to Dashboard</a>
+
+<script>
+document.getElementById("dataForm").addEventListener("submit", function(e) {
+  e.preventDefault();
+
+  const reg = document.getElementById("regName").value.trim();
+  const model = document.getElementById("modelName").value.trim();
+  const planned = document.getElementById("plannedDate").value;
+  const impl = document.getElementById("implDate").value;
+
+  if (!reg || !model || !planned || !impl) return alert("Please fill all fields");
+
+  // Get existing data from localStorage
+  let data = JSON.parse(localStorage.getItem("carRegulationData")) || {
+    planned: {},
+    regulations: [],
+    models: [],
+    timeline: {}
+  };
+
+  // Add regulation if new
+  if (!data.regulations.includes(reg)) data.regulations.push(reg);
+  // Add model if new
+  if (!data.models.includes(model)) data.models.push(model);
+
+  // Update planned date
+  data.planned[reg] = new Date(planned).toDateString();
+
+  // Add timeline entry
+  if (!data.timeline[reg]) data.timeline[reg] = {};
+  data.timeline[reg][model] = new Date(impl).toDateString();
+
+  // Save back to localStorage
+  localStorage.setItem("carRegulationData", JSON.stringify(data));
+
+  alert("✅ Data saved successfully!");
+  document.getElementById("dataForm").reset();
+});
+</script>
+
+</body>
+</html>
