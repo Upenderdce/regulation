@@ -20,7 +20,7 @@
     border-collapse: collapse;
     margin-top: 15px;
     font-size: 14px;
-    table-layout: fixed;
+    table-layout: auto;
     overflow-x: auto;
     display: block;
     white-space: nowrap;
@@ -38,7 +38,18 @@
   th {
     background-color: #34495e;
     color: white;
+    position: relative;
   }
+  th .resize-handle {
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 5px;
+  height: 100%;
+  cursor: col-resize;
+  user-select: none;
+}
+
   tr:nth-child(even) { background-color: #f2f2f2; }
 
   .planned { background-color: #36b9cc; color: white; font-weight: bold; }
@@ -110,10 +121,11 @@ div[draggable='true'].editing {
 
 
 <div class="controls">
-  <label><input type="radio" name="viewMode" value="month" checked> Month-wise</label>
-  <label><input type="radio" name="viewMode" value="quarter"> Quarter-wise</label>
-  <label><input type="radio" name="viewMode" value="phase"> Beg–Mid–End (Days)</label>
+  <label><input type="checkbox" name="viewMode" class="viewMode" value="year" checked> Year</label>
+  <label><input type="checkbox" name="viewMode" class="viewMode" value="month" checked> Month</label>
+  <label><input type="checkbox" name="viewMode" class="viewMode" value="quarter"> Quarter</label>
 </div>
+
 <div id="dataManager" style="text-align:center; margin-bottom:20px;">
   <div id="regList"></div>
   <div id="modelList" style="margin-top:10px;"></div>
@@ -138,104 +150,7 @@ const data = {
   }
 };
 
-function buildTables(mode) {
-  const regTable = document.getElementById('regTable');
-  const modelTable = document.getElementById('modelTable');
-  regTable.innerHTML = '';
-  modelTable.innerHTML = '';
 
-  let headers;
-  if (mode === 'month') headers = ['01','02','03','04','05','06','07','08','09','10','11','12'];
-  else if (mode === 'quarter') headers = ['Q1','Q2','Q3','Q4'];
-  else headers = ['B','M','E'];
-
-  const years = [2025, 2026, 2027, 2028, 2029];
-
-  // ---------------- Year + Period Header ----------------
-  function createHeader(firstCol) {
-    let yearRow = `<tr><th rowspan="2">${firstCol}</th>`;
-    for (let y of years) yearRow += `<th colspan="${headers.length}">${y}</th>`;
-    yearRow += '</tr>';
-
-    let periodRow = '<tr>';
-    for (let _ of years) for (let h of headers) periodRow += `<th>${h}</th>`;
-    periodRow += '</tr>';
-
-    return yearRow + periodRow;
-  }
-
-  // ---------------- Regulation-wise ----------------
-  let regHTML = createHeader('Regulation');
-  regHTML += `<tr><td class="planned">Planned</td>`;
-  for (let y of years) {
-    for (let h of headers) {
-      let mark = '';
-      for (let reg of data.regulations) {
-        const [month, day, year] = data.planned[reg].split(' ');
-        if (parseInt(year) === y && matchesPeriod(month, parseInt(day), h, mode)) {
-          mark += `<div draggable="true">${reg}</div>`;
-        }
-      }
-      regHTML += `<td class="planned">${mark}</td>`;
-    }
-  }
-  regHTML += '</tr>';
-
-  for (let reg of data.regulations) {
-    let row = `<tr><td>${reg}</td>`;
-    for (let y of years) {
-      for (let h of headers) {
-        let mark = '';
-        for (let model of data.models) {
-          const [month, day, year] = data.timeline[reg][model].split(' ');
-          if (parseInt(year) === y && matchesPeriod(month, parseInt(day), h, mode)) {
-            mark += `<div class="highlight" draggable="true">${model}</div>`;
-          }
-        }
-        row += `<td>${mark}</td>`;
-      }
-    }
-    row += '</tr>';
-    regHTML += row;
-  }
-  regTable.innerHTML = regHTML;
-
-  // ---------------- Model-wise ----------------
-  let modelHTML = createHeader('Model');
-  modelHTML += `<tr><td class="planned">Planned</td>`;
-  for (let y of years) {
-    for (let h of headers) {
-      let mark = '';
-      for (let reg of data.regulations) {
-        const [month, day, year] = data.planned[reg].split(' ');
-        if (parseInt(year) === y && matchesPeriod(month, parseInt(day), h, mode)) {
-          mark += `<div draggable="true">${reg}</div>`;
-        }
-      }
-      modelHTML += `<td class="planned">${mark}</td>`;
-    }
-  }
-  modelHTML += '</tr>';
-
-  for (let model of data.models) {
-    let row = `<tr><td>${model}</td>`;
-    for (let y of years) {
-      for (let h of headers) {
-        let mark = '';
-        for (let reg of data.regulations) {
-          const [month, day, year] = data.timeline[reg][model].split(' ');
-          if (parseInt(year) === y && matchesPeriod(month, parseInt(day), h, mode)) {
-            mark += `<div class="highlight" draggable="true">${reg}</div>`;
-          }
-        }
-        row += `<td>${mark}</td>`;
-      }
-    }
-    row += '</tr>';
-    modelHTML += row;
-  }
-  modelTable.innerHTML = modelHTML;
-}
 
 
 // ---------------- Enable Drag & Drop ----------------
@@ -396,6 +311,38 @@ function buildDataManager() {
   });
 }
 
+function makeColumnsResizable(tableId) {
+  const table = document.getElementById(tableId);
+  const cols = table.querySelectorAll("th");
+
+  cols.forEach(th => {
+    const handle = document.createElement("div");
+    handle.classList.add("resize-handle");
+    th.appendChild(handle);
+
+    let startX, startWidth;
+
+    handle.addEventListener("mousedown", (e) => {
+      startX = e.pageX;
+      startWidth = th.offsetWidth;
+      document.documentElement.style.cursor = "col-resize";
+      document.addEventListener("mousemove", onMouseMove);
+      document.addEventListener("mouseup", onMouseUp);
+    });
+
+    function onMouseMove(e) {
+      const diffX = e.pageX - startX;
+      const newWidth = Math.max(40, startWidth + diffX);
+      th.style.width = newWidth + "px";
+    }
+
+    function onMouseUp() {
+      document.documentElement.style.cursor = "";
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+    }
+  });
+}
 
 function rebuildAndRefresh() {
   const mode = document.querySelector('input[name="viewMode"]:checked').value;
@@ -403,6 +350,9 @@ function rebuildAndRefresh() {
   enableDragAndDrop();
   enableEditing();
   buildDataManager();
+  makeColumnsResizable("regTable");
+  makeColumnsResizable("modelTable");
+
 }
 
 
@@ -440,7 +390,8 @@ document.querySelectorAll('input[name="viewMode"]').forEach(r =>
     enableDragAndDrop(); // reattach handlers
     enableEditing();
     buildDataManager();
-
+    makeColumnsResizable("regTable");
+    makeColumnsResizable("modelTable");
   })
 );
 
@@ -463,8 +414,201 @@ document.getElementById('showModel').addEventListener('click', () => {
   document.getElementById('showReg').classList.remove('active');
 });
 
-// ---------------- Initialize ----------------
-buildTables('month');
+document.querySelectorAll('.viewMode').forEach(cb => {
+  cb.addEventListener('change', rebuildDynamicTable);
+});
+
+
+function rebuildDynamicTable() {
+  const selected = Array.from(document.querySelectorAll('.viewMode:checked')).map(c => c.value);
+  if (selected.length === 0) {
+    document.getElementById('regTable').innerHTML =
+      "<tr><td colspan='100%' style='text-align:center;color:#888;'>Select at least one header type</td></tr>";
+    document.getElementById('modelTable').innerHTML = "";
+    return;
+  }
+  buildFlexibleTable(selected);
+}
+
+function buildFlexibleTable(selected) {
+  const regTable = document.getElementById('regTable');
+  const modelTable = document.getElementById('modelTable');
+  regTable.innerHTML = '';
+  modelTable.innerHTML = '';
+
+  const years = [2025, 2026, 2027, 2028, 2029];
+  const months = ['01','02','03','04','05','06','07','08','09','10','11','12'];
+  const quarters = ['Q1','Q2','Q3','Q4'];
+
+  // ---------------- Header Builder ----------------
+  function createHeader(firstCol) {
+  let html = "";
+  const years = [2025, 2026, 2027, 2028, 2029];
+  const months = ['01','02','03','04','05','06','07','08','09','10','11','12'];
+  const quarters = ['Q1','Q2','Q3','Q4'];
+
+  const totalRows = 1 + (selected.includes('quarter') ? 1 : 0) + (selected.includes('month') ? 1 : 0);
+
+  // === Row 1: Year ===
+  html += `<tr><th rowspan="${totalRows}">${firstCol}</th>`;
+  for (let y of years) {
+    let colspan = 1;
+    if (selected.includes('quarter')) colspan = 12;
+    else if (selected.includes('month')) colspan = 12;
+    html += `<th colspan="${colspan}">${y}</th>`;
+  }
+  html += `</tr>`;
+
+  // === Row 2: Quarter ===
+  if (selected.includes('quarter')) {
+    html += `<tr>`;
+    for (let y of years) {
+      quarters.forEach(q => html += `<th colspan="3">${q}</th>`);
+    }
+    html += `</tr>`;
+  }
+
+  // === Row 3: Month ===
+  if (selected.includes('month')) {
+    html += `<tr>`;
+    for (let y of years) {
+      months.forEach(m => html += `<th>${m}</th>`);
+    }
+    html += `</tr>`;
+  }
+
+  return html;
+}
+
+
+  // ---------------- Regulation-wise Table ----------------
+  let regHTML = createHeader('Regulation');
+  regHTML += buildRows('regulation', years, months, quarters, selected);
+  regTable.innerHTML = regHTML;
+
+  // ---------------- Model-wise Table ----------------
+  let modelHTML = createHeader('Model');
+  modelHTML += buildRows('model', years, months, quarters, selected);
+  modelTable.innerHTML = modelHTML;
+
+  enableDragAndDrop();
+  enableEditing();
+  makeColumnsResizable("regTable");
+  makeColumnsResizable("modelTable");
+}
+
+function buildRows(type, years, months, quarters, selected) {
+  let html = '';
+
+  // ===== Planned row =====
+  html += `<tr><td class="planned">Planned</td>`;
+  for (let y of years) {
+    if (selected.includes('quarter')) {
+      quarters.forEach(q => {
+        for (let i = 0; i < 3; i++) {
+          html += `<td></td>`;
+        }
+      });
+    } else if (selected.includes('month')) {
+      months.forEach(m => {
+        let mark = '';
+        for (let reg of data.regulations) {
+          const [month, day, year] = data.planned[reg].split(' ');
+          if (parseInt(year) === y && matchesPeriod(month, parseInt(day), m, 'month'))
+            mark += `<div draggable="true">${reg}</div>`;
+        }
+        html += `<td class="planned">${mark}</td>`;
+      });
+    } else {
+      // Year-only
+      let mark = '';
+      for (let reg of data.regulations) {
+        const [month, day, year] = data.planned[reg].split(' ');
+        if (parseInt(year) === y) mark += `<div draggable="true">${reg}</div>`;
+      }
+      html += `<td class="planned">${mark}</td>`;
+    }
+  }
+  html += '</tr>';
+
+  // ===== Regulation or Model rows =====
+  const outerList = type === 'regulation' ? data.regulations : data.models;
+
+  outerList.forEach(item => {
+    html += `<tr><td>${item}</td>`;
+    for (let y of years) {
+      // ---- Quarter view ----
+      if (selected.includes('quarter')) {
+        quarters.forEach(q => {
+          for (let i = 0; i < 3; i++) { // each quarter has 3 months
+            let mark = '';
+            if (type === 'regulation') {
+              for (let model of data.models) {
+                const [month, day, year] = data.timeline[item][model].split(' ');
+                if (parseInt(year) === y && matchesPeriod(month, parseInt(day), q, 'quarter'))
+                  mark += `<div class="highlight" draggable="true">${model}</div>`;
+              }
+            } else {
+              for (let reg of data.regulations) {
+                const [month, day, year] = data.timeline[reg][item].split(' ');
+                if (parseInt(year) === y && matchesPeriod(month, parseInt(day), q, 'quarter'))
+                  mark += `<div class="highlight" draggable="true">${reg}</div>`;
+              }
+            }
+            html += `<td>${mark}</td>`;
+          }
+        });
+      }
+
+      // ---- Month view ----
+      else if (selected.includes('month')) {
+        months.forEach(m => {
+          let mark = '';
+          if (type === 'regulation') {
+            for (let model of data.models) {
+              const [month, day, year] = data.timeline[item][model].split(' ');
+              if (parseInt(year) === y && matchesPeriod(month, parseInt(day), m, 'month'))
+                mark += `<div class="highlight" draggable="true">${model}</div>`;
+            }
+          } else {
+            for (let reg of data.regulations) {
+              const [month, day, year] = data.timeline[reg][item].split(' ');
+              if (parseInt(year) === y && matchesPeriod(month, parseInt(day), m, 'month'))
+                mark += `<div class="highlight" draggable="true">${reg}</div>`;
+            }
+          }
+          html += `<td>${mark}</td>`;
+        });
+      }
+
+      // ---- Year-only view ----
+      else {
+        let mark = '';
+        if (type === 'regulation') {
+          for (let model of data.models) {
+            const [month, day, year] = data.timeline[item][model].split(' ');
+            if (parseInt(year) === y)
+              mark += `<div class="highlight" draggable="true">${model}</div>`;
+          }
+        } else {
+          for (let reg of data.regulations) {
+            const [month, day, year] = data.timeline[reg][item].split(' ');
+            if (parseInt(year) === y)
+              mark += `<div class="highlight" draggable="true">${reg}</div>`;
+          }
+        }
+        html += `<td>${mark}</td>`;
+      }
+    }
+    html += `</tr>`;
+  });
+
+  return html;
+}
+
+
+// Initialize default (year + month)
+buildFlexibleTable(['year', 'month']);
 enableDragAndDrop();
 enableEditing();
 buildDataManager();
